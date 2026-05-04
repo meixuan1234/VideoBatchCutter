@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "VideoBatchCutter/1.0.0": {
+        "runtime": {
+          "VideoBatchCutter.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "VideoBatchCutter/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

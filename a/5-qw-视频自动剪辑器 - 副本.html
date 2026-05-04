@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频自动剪辑器 - 纯前端本地处理</title>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/core@0.12.10/dist/core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #7209b7;
+            --success: #06d6a0;
+            --warning: #ffd166;
+            --danger: #ef476f;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --border: #dee2e6;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
+        }
+        
+        .privacy-note {
+            background: var(--light);
+            border-radius: 12px;
+            padding: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid var(--border);
+            font-size: 0.95rem;
+            color: var(--gray);
+            box-shadow: var(--shadow);
+        }
+        
+        .privacy-note strong {
+            color: var(--primary);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        @media (min-width: 992px) {
+            .main-content {
+                grid-template-columns: 1fr 380px;
+            }
+        }
+        
+        .upload-section {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area {
+            height: 280px;
+            border: 3px dashed var(--border);
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background-color: #fafcff;
+            margin: 20px;
+        }
+        
+        .upload-area.highlight {
+            border-color: var(--primary);
+            background-color: rgba(67, 97, 238, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(67, 97, 238, 0.15);
+        }
+        
+        .upload-icon {
+            font-size: 4.5rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        
+        .upload-text h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        .upload-text p {
+            color: var(--gray);
+            margin-bottom: 15px;
+            max-width: 400px;
+        }
+        
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+        }
+        
+        .btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(67, 97, 238, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #a0b0e0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .settings-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+        }
+        
+        .section-title {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 22px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 1.05rem;
+            transition: border-color 0.2s;
+        }
+        
+        input[type="number"]:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+        
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .btn-outline {
+            background: white;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-outline:hover:not(:disabled) {
+            background: rgba(67, 97, 238, 0.05);
+        }
+        
+        .video-list {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+            margin-top: 20px;
+        }
+        
+        .video-item {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            background: #fafcff;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+        
+        .video-item:hover {
+            transform: translateX(3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .video-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .video-name {
+            font-weight: 600;
+            color: var(--dark);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 70%;
+        }
+        
+        .video-duration {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .video-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        
+        .status-pending {
+            background: rgba(108, 117, 125, 0.1);
+            color: var(--gray);
+        }
+        
+        .status-processing {
+            background: rgba(255, 209, 102, 0.2);
+            color: #d4a300;
+        }
+        
+        .status-success {
+            background: rgba(6, 214, 160, 0.15);
+            color: #058c6b;
+        }
+        
+        .status-error {
+            background: rgba(239, 71, 111, 0.15);
+            color: #c72e50;
+        }
+        
+        .progress-container {
+            margin: 25px 0;
+        }
+        
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .progress-bar {
+            height: 12px;
+            background: var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 6px;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        
+        .log-section {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding-left: 10px;
+            border-left: 3px solid;
+        }
+        
+        .log-info {
+            border-color: var(--primary);
+        }
+        
+        .log-success {
+            border-color: var(--success);
+        }
+        
+        .log-warning {
+            border-color: var(--warning);
+            color: #e6b325;
+        }
+        
+        .log-error {
+            border-color: var(--danger);
+            color: #f87171;
+        }
+        
+        .loader {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+        
+        .processing-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--border);
+        }
+        
+        .processing-content h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        .processing-steps {
+            text-align: left;
+            margin: 25px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-left: 10px;
+        }
+        
+        .step-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .step-icon.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .step-icon.done {
+            background: var(--success);
+            color: white;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: var(--gray);
+            font-size: 0.95rem;
+            padding: 20px 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .error-message {
+            color: var(--danger);
+            font-size: 0.9rem;
+            margin-top: 6px;
+            display: none;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background: var(--success);
+        }
+        
+        .notification.error {
+            background: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>视频自动剪辑器</h1>
+            <div class="privacy-note">
+                <strong>隐私提示：</strong> 所有视频处理均在您的浏览器本地完成，<strong>不会上传任何数据到服务器</strong>。处理完成后，原始文件和剪辑结果仅保存在您的设备上。
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="dropArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        <h2>拖放视频文件到这里</h2>
+                        <p>支持 MP4, MOV, AVI, FLV 等主流格式</p>
+                        <button class="btn" id="browseBtn">
+                            <span>浏览文件</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="video-list" id="videoList">
+                    <h2 class="section-title">上传的视频列表</h2>
+                    <div id="videoItemsContainer">
+                        <!-- 视频项将动态生成 -->
+                        <div class="empty-state" id="emptyState">
+                            <p style="text-align: center; color: var(--gray); padding: 30px 0;">
+                                尚未上传任何视频文件，请先上传视频
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h2 class="section-title">剪辑设置</h2>
+                
+                <div class="form-group">
+                    <label for="clipDuration">截取时长 (秒)</label>
+                    <input type="number" id="clipDuration" min="1" placeholder="输入要截取的秒数，例如：15">
+                    <div class="error-message" id="durationError">请输入有效的正整数</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="renamePrefix">重命名前缀</label>
+                    <input type="text" id="renamePrefix" placeholder="留空使用默认规则（原文件名_剪辑）">
+                </div>
+                
+                <div class="form-group">
+                    <label for="zipName">压缩包名称</label>
+                    <input type="text" id="zipName" value="视频剪辑结果" placeholder="输入下载的ZIP文件名">
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn" id="processBtn">
+                        <span>开始处理</span>
+                    </button>
+                    <button class="btn btn-outline" id="clearBtn">
+                        <span>清空列表</span>
+                    </button>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-label">
+                        <span>处理进度</span>
+                        <span id="progressText">0/0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress" id="progressBar"></div>
+                    </div>
+                </div>
+                
+                <h2 class="section-title" style="margin-top: 25px;">处理日志</h2>
+                <div class="log-section" id="logArea">
+                    <div class="log-entry log-info">欢迎使用视频自动剪辑器！所有处理均在本地完成，无需担心隐私问题。</div>
+                    <div class="log-entry log-info">请先上传视频文件，然后设置剪辑参数并点击"开始处理"。</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="notification success" id="successNotification">
+            剪辑完成！压缩包已自动下载
+        </div>
+        
+        <div class="notification error" id="errorNotification">
+            处理过程中出现错误，请查看日志详情
+        </div>
+        
+        <footer>
+            <p>视频自动剪辑器 © 2023 | 纯前端实现 | 所有处理均在您的浏览器中完成</p>
+            <p style="margin-top: 8px; font-size: 0.9rem; color: var(--gray);">
+                使用 ffmpeg.wasm 进行本地视频处理 | 无需网络连接
+            </p>
+        </footer>
+    </div>
+    
+    <div class="processing-overlay hidden" id="processingOverlay">
+        <div class="processing-content">
+            <h2>正在处理视频...</h2>
+            <p>这可能需要一些时间，具体取决于视频大小和您的设备性能</p>
+            
+            <div class="processing-steps">
+                <div class="step">
+                    <div class="step-icon active">1</div>
+                    <div>解析视频元数据</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">2</div>
+                    <div>计算随机剪辑点</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">3</div>
+                    <div>执行视频剪辑</div>
+                </div>
+                <div class="step">
+                    <div class="step-icon">4</div>
+                    <div>打包剪辑结果</div>
+                </div>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-label">
+                    <span>总体进度</span>
+                    <span id="overallProgressText">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress" id="overallProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <button class="btn btn-outline" id="cancelBtn" style="margin-top: 20px; opacity: 0.8;">
+                取消处理
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const dropArea = document.getElementById('dropArea');
+        const browseBtn = document.getElementById('browseBtn');
+        const fileInput = document.createElement('input');
+        const processBtn = document.getElementById('processBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const clipDurationInput = document.getElementById('clipDuration');
+        const renamePrefixInput = document.getElementById('renamePrefix');
+        const zipNameInput = document.getElementById('zipName');
+        const videoItemsContainer = document.getElementById('videoItemsContainer');
+        const logArea = document.getElementById('logArea');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const emptyState = document.getElementById('emptyState');
+        const durationError = document.getElementById('durationError');
+        const processingOverlay = document.getElementById('processingOverlay');
+        const overallProgressBar = document.getElementById('overallProgressBar');
+        const overallProgressText = document.getElementById('overallProgressText');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const successNotification = document.getElementById('successNotification');
+        const errorNotification = document.getElementById('errorNotification');
+        
+        let videoFiles = [];
+        let isProcessing = false;
+        let ffmpeg;
+        
+        // 初始化文件输入
+        fileInput.type = 'file';
+        fileInput.accept = 'video/*';
+        fileInput.multiple = true;
+        fileInput.onchange = handleFileSelect;
+        
+        // 初始化 ffmpeg
+        async function initFFmpeg() {
+            try {
+                logMessage('正在初始化视频处理引擎...', 'info');
+                ffmpeg = {
+                    core: await createFFmpeg({ log: false, progress: updateFFmpegProgress }),
+                    ready: false
+                };
+                await ffmpeg.core.load();
+                ffmpeg.ready = true;
+                logMessage('视频处理引擎初始化完成', 'success');
+            } catch (err) {
+                logMessage(`引擎初始化失败: ${err.message}`, 'error');
+                showErrorNotification('视频处理引擎初始化失败，请刷新页面重试');
+            }
+        }
+        
+        // 更新 ffmpeg 进度
+        function updateFFmpegProgress(progress) {
+            if (progress) {
+                const percent = Math.round(progress.ratio * 100);
+                overallProgressText.textContent = `${percent}%`;
+                overallProgressBar.style.width = `${percent}%`;
+            }
+        }
+        
+        // 拖拽事件处理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+        
+        // 处理文件选择
+        function handleFileSelect(e) {
+            const files = e.target.files || e.dataTransfer.files;
+            addVideoFiles(files);
+        }
+        
+        // 添加视频文件
+        function addVideoFiles(files) {
+            if (isProcessing) return;
+            
+            const validFiles = [];
+            const invalidFiles = [];
+            
+            // 验证文件类型
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileType = file.type.split('/')[0];
+                
+                if (fileType === 'video') {
+                    validFiles.push(file);
+                } else {
+                    invalidFiles.push(file.name);
+                }
+            }
+            
+            // 处理无效文件
+            if (invalidFiles.length > 0) {
+                logMessage(`已跳过 ${invalidFiles.length} 个非视频文件: ${invalidFiles.join(', ')}`, 'warning');
+            }
+            
+            // 处理有效文件
+            if (validFiles.length > 0) {
+                validFiles.forEach(file => {
+                    const videoItem = {
+                        file: file,
+                        name: file.name.replace(/\.[^/.]+$/, ""),
+                        extension: file.name.split('.').pop(),
+                        duration: null,
+                        status: 'pending',
+                        processedBlob: null
+                    };
+                    
+                    videoFiles.push(videoItem);
+                    logMessage(`已添加视频: ${file.name}`, 'info');
+                });
+                
+                updateVideoList();
+                updateProgressDisplay();
+            }
+        }
+        
+        // 更新视频列表
+        function updateVideoList() {
+            if (videoFiles.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            videoItemsContainer.innerHTML = '';
+            
+            videoFiles.forEach((video, index) => {
+                const videoItem = document.createElement('div');
+                videoItem.className = `video-item`;
+                
+                const durationDisplay = video.duration ? 
+                    `${Math.floor(video.duration)}秒` : 
+                    '分析中...';
+                
+                const statusClass = {
+                    'pending': 'status-pending',
+                    'processing': 'status-processing',
+                    'success': 'status-success',
+                    'error': 'status-error'
+                }[video.status];
+                
+                const statusText = {
+                    'pending': '等待处理',
+                    'processing': '处理中...',
+                    'success': '剪辑成功',
+                    'error': '处理失败'
+                }[video.status];
+                
+                videoItem.innerHTML = `
+                    <div class="video-header">
+                        <div class="video-name" title="${video.file.name}">${video.file.name}</div>
+                        <div class="video-duration">${durationDisplay}</div>
+                    </div>
+                    <div class="video-status ${statusClass}">${statusText}</div>
+                `;
+                
+                videoItemsContainer.appendChild(videoItem);
+            });
+        }
+        
+        // 更新进度显示
+        function updateProgressDisplay() {
+            const total = videoFiles.length;
+            const processed = videoFiles.filter(v => v.status === 'success').length;
+            const failed = videoFiles.filter(v => v.status === 'error').length;
+            
+            progressText.textContent = `${processed + failed}/${total}`;
+            progressBar.style.width = total > 0 ? `${((processed + failed) / total) * 100}%` : '0%';
+        }
+        
+        // 获取视频时长
+        async function getVideoDuration(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                
+                video.onloadedmetadata = function() {
+                    window.URL.revokeObjectURL(video.src);
+                    resolve(video.duration);
+                };
+                
+                video.onerror = function() {
+                    window.URL.revokeObjectURL(video.src);
+                    reject(new Error('无法获取视频时长'));
+                };
+                
+                video.src = URL.createObjectURL(file);
+            });
+        }
+        
+        // 验证输入
+        function validateInputs() {
+            const duration = parseInt(clipDurationInput.value);
+            let isValid = true;
+            
+            // 重置错误状态
+            clipDurationInput.classList.remove('error');
+            durationError.style.display = 'none';
+            
+            // 检查视频文件
+            if (videoFiles.length === 0) {
+                logMessage('错误：请先上传至少一个视频文件', 'error');
+                isValid = false;
+            }
+            
+            // 检查截取时长
+            if (!clipDurationInput.value || isNaN(duration) || duration <= 0) {
+                clipDurationInput.classList.add('error');
+                durationError.style.display = 'block';
+                logMessage('错误：请输入有效的截取时长（正整数）', 'error');
+                isValid = false;
+            }
+            
+            return isValid;
+        }
+        
+        // 开始处理
+        async function startProcessing() {
+            if (isProcessing || !validateInputs()) return;
+            
+            isProcessing = true;
+            processBtn.disabled = true;
+            clearBtn.disabled = true;
+            clipDurationInput.disabled = true;
+            
+            // 显示处理覆盖层
+            processingOverlay.classList.remove('hidden');
+            
+            try {
+                // 获取所有视频时长
+                logMessage('正在分析视频时长...', 'info');
+                await analyzeVideoDurations();
+                
+                // 验证视频时长
+                const duration = parseInt(clipDurationInput.value);
+                const invalidVideos = videoFiles.filter(v => v.duration < duration);
+                
+                if (invalidVideos.length > 0) {
+                    // 标记无效视频
+                    invalidVideos.forEach(video => {
+                        video.status = 'error';
+                        video.error = `视频时长(${Math.floor(video.duration)}秒)小于截取时长(${duration}秒)`;
+                    });
+                    
+                    updateVideoList();
+                    updateProgressDisplay();
+                    
+                    logMessage(`错误：${invalidVideos.length} 个视频时长不足，已跳过处理`, 'error');
+                    
+                    // 如果所有视频都无效，提前结束
+                    if (videoFiles.length === invalidVideos.length) {
+                        throw new Error('所有视频时长均小于截取时长');
+                    }
+                }
+                
+                // 开始剪辑
+                logMessage(`开始处理 ${videoFiles.length} 个视频...`, 'info');
+                await processVideos();
+                
+                // 打包并下载
+                logMessage('正在打包剪辑结果...', 'info');
+                await packageAndDownload();
+                
+                logMessage('所有视频处理完成！', 'success');
+                showSuccessNotification('剪辑完成！压缩包已自动下载');
+            } catch (error) {
+                logMessage(`处理失败: ${error.message}`, 'error');
+                showErrorNotification(`处理失败: ${error.message}`);
+            } finally {
+                isProcessing = false;
+                processBtn.disabled = false;
+                clearBtn.disabled = false;
+                clipDurationInput.disabled = false;
+                
+                // 隐藏处理覆盖层
+                setTimeout(() => {
+                    processingOverlay.classList.add('hidden');
+                }, 800);
+            }
+        }
+        
+        // 分析视频时长
+        async function analyzeVideoDurations() {
+            for (let i = 0; i < videoFiles.length; i++) {
+                const video = videoFiles[i];
+                video.status = 'processing';
+                updateVideoList();
+                
+                try {
+                    const duration = await getVideoDuration(video.file);
+                    video.duration = duration;
+                    logMessage(`视频 "${video.file.name}" 时长: ${Math.floor(duration)}秒`, 'info');
+                } catch (error) {
+                    video.status = 'error';
+                    video.error = '无法获取时长';
+                    logMessage(`无法获取 "${video.file.name}" 的时长: ${error.message}`, 'error');
+                }
+                
+                updateProgressDisplay();
+            }
+        }
+        
+        // 处理视频
+        async function processVideos() {
+            const duration = parseInt(clipDurationInput.value);
+            const validVideos = videoFiles.filter(v => v.status !== 'error');
+            
+            for (let i = 0; i < validVideos.length; i++) {
+                const video = validVideos[i];
+                video.status = 'processing';
+                updateVideoList();
+                
+                try {
+                    // 生成随机起始点（确保有足够时长）
+                    const maxStart = Math.max(0, video.duration - duration - 0.1);
+                    const start = parseFloat(Math.random() * maxStart).toFixed(1);
+                    
+                    logMessage(`处理 "${video.file.name}": 从 ${start}秒 开始截取 ${duration}秒`, 'info');
+                    
+                    // 使用 ffmpeg 剪辑视频
+                    const processedBlob = await clipVideo(video.file, start, duration);
+                    video.processedBlob = processedBlob;
+                    video.status = 'success';
+                    
+                    logMessage(`成功剪辑: ${video.file.name}`, 'success');
+                } catch (error) {
+                    video.status = 'error';
+                    video.error = error.message;
+                    logMessage(`剪辑失败 "${video.file.name}": ${error.message}`, 'error');
+                }
+                
+                updateVideoList();
+                updateProgressDisplay();
+            }
+        }
+        
+        // 剪辑视频
+        async function clipVideo(file, startTime, duration) {
+            if (!ffmpeg || !ffmpeg.ready) {
+                throw new Error('视频处理引擎未准备好');
+            }
+            
+            try {
+                // 将文件添加到 ffmpeg 文件系统
+                const data = await file.arrayBuffer();
+                ffmpeg.core.FS('writeFile', 'input.mp4', new Uint8Array(data));
+                
+                // 执行剪辑命令
+                await ffmpeg.core.run(
+                    '-i', 'input.mp4',
+                    '-ss', startTime.toString(),
+                    '-t', duration.toString(),
+                    '-c', 'copy',
+                    'output.mp4'
+                );
+                
+                // 读取处理后的文件
+                const outputData = ffmpeg.core.FS('readFile', 'output.mp4');
+                return new Blob([outputData.buffer], { type: 'video/mp4' });
+            } catch (error) {
+                console.error('FFmpeg error:', error);
+                throw new Error('视频剪辑失败 - 可能是格式不支持');
+            }
+        }
+        
+        // 打包并下载
+        async function packageAndDownload() {
+            const zip = new JSZip();
+            const validVideos = videoFiles.filter(v => v.status === 'success');
+            const prefix = renamePrefixInput.value.trim() || '';
+            const zipName = zipNameInput.value.trim() || '视频剪辑结果';
+            
+            // 添加剪辑后的视频到ZIP
+            for (let i = 0; i < validVideos.length; i++) {
+                const video = validVideos[i];
+                const fileName = prefix ? 
+                    `${prefix}_${i + 1}.mp4` : 
+                    `${video.name}_剪辑.${video.extension}`;
+                
+                zip.file(fileName, video.processedBlob);
+                logMessage(`已添加到压缩包: ${fileName}`, 'info');
+            }
+            
+            // 生成并下载ZIP
+            const content = await zip.generateAsync({ type: 'blob' });
+            saveAs(content, `${zipName}.zip`);
+            
+            logMessage(`已生成压缩包: ${zipName}.zip`, 'success');
+        }
+        
+        // 清空列表
+        function clearList() {
+            if (isProcessing) return;
+            
+            videoFiles = [];
+            updateVideoList();
+            updateProgressDisplay();
+            logMessage('已清空视频列表', 'info');
+        }
+        
+        // 日志消息
+        function logMessage(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        // 显示通知
+        function showNotification(element, message) {
+            element.textContent = message;
+            element.classList.add('show');
+            
+            setTimeout(() => {
+                element.classList.remove('show');
+            }, 5000);
+        }
+        
+        function showSuccessNotification(message) {
+            showNotification(successNotification, message);
+        }
+        
+        function showErrorNotification(message) {
+            showNotification(errorNotification, message);
+        }
+        
+        // 事件监听
+        browseBtn.addEventListener('click', () => {
+            if (!isProcessing) fileInput.click();
+        });
+        
+        dropArea.addEventListener('drop', handleFileSelect);
+        
+        processBtn.addEventListener('click', startProcessing);
+        
+        clearBtn.addEventListener('click', clearList);
+        
+        cancelBtn.addEventListener('click', () => {
+            if (isProcessing) {
+                isProcessing = false;
+                logMessage('用户已取消处理', 'warning');
+                processingOverlay.classList.add('hidden');
+                processBtn.disabled = false;
+                clearBtn.disabled = false;
+                clipDurationInput.disabled = false;
+            }
+        });
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initFFmpeg();
+            
+            // 添加示例文件（仅用于演示，实际使用时可删除）
+            // setTimeout(() => {
+            //     const exampleFiles = [
+            //         new File([""], "示例视频1.mp4", {type: "video/mp4"}),
+            //         new File([""], "示例视频2.mp4", {type: "video/mp4"})
+            //     ];
+            //     addVideoFiles(exampleFiles);
+            // }, 1000);
+        });
+    </script>
+</body>
+</html>

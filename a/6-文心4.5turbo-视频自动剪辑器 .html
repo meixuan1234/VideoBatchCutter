@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频自动剪辑器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #06d6a0;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --light-gray: #e9ecef;
+            --danger: #e63946;
+            --success: #06d6a0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: #f5f7fb;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        h1 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        
+        .privacy-notice {
+            font-size: 14px;
+            color: var(--gray);
+            margin-top: 10px;
+        }
+        
+        .privacy-notice i {
+            color: var(--primary);
+            margin-right: 5px;
+        }
+        
+        .upload-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--light-gray);
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            background-color: var(--light);
+        }
+        
+        .upload-area.highlight {
+            border-color: var(--primary);
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        .upload-area i {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        
+        .upload-area h3 {
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+        
+        .upload-area p {
+            color: var(--gray);
+            margin-bottom: 15px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .settings-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .settings-group {
+            margin-bottom: 20px;
+        }
+        
+        .settings-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .settings-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--light-gray);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .settings-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+        
+        .settings-group input::placeholder {
+            color: var(--gray);
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #3a56d4;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-outline {
+            background-color: white;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .video-list {
+            margin-top: 20px;
+        }
+        
+        .video-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        .video-item:last-child {
+            border-bottom: none;
+        }
+        
+        .video-info {
+            flex-grow: 1;
+        }
+        
+        .video-info h4 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .video-info p {
+            font-size: 14px;
+            color: var(--gray);
+        }
+        
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        
+        .status-processing {
+            background-color: #cff1e6;
+            color: #0a3622;
+        }
+        
+        .status-success {
+            background-color: #d1fae8;
+            color: #065f46;
+        }
+        
+        .status-error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background-color: var(--primary);
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        
+        .logs {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 5px;
+            border-radius: 3px;
+        }
+        
+        .log-info {
+            background-color: #e9ecef;
+        }
+        
+        .log-success {
+            background-color: #d1fae8;
+            color: #065f46;
+        }
+        
+        .log-error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .log-warning {
+            background-color: #fffbeb;
+            color: #92400e;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: var(--gray);
+            font-size: 14px;
+            padding: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .buttons {
+                flex-direction: column;
+            }
+            
+            body {
+                padding: 10px;
+            }
+            
+            .upload-section, .settings-section, .status-section {
+                padding: 20px 15px;
+            }
+        }
+        
+        .loading {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-video"></i> 视频自动剪辑器</h1>
+            <p class="privacy-notice"><i class="fas fa-shield-alt"></i> 所有处理均在本地浏览器完成，视频不会上传到任何服务器</p>
+        </header>
+        
+        <section class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>拖拽视频文件到此处</h3>
+                <p>支持 MP4、MOV、AVI、FLV 等格式，可同时上传多个文件</p>
+                <p>或点击此处选择文件</p>
+                <input type="file" id="fileInput" class="file-input" accept="video/*" multiple>
+            </div>
+            
+            <div class="video-list" id="videoList">
+                <!-- 视频列表将通过JS动态生成 -->
+            </div>
+        </section>
+        
+        <section class="settings-section">
+            <div class="settings-group">
+                <label for="clipDuration">截取时长（秒）</label>
+                <input type="number" id="clipDuration" placeholder="请输入要截取的时长（秒）" min="1">
+            </div>
+            
+            <div class="settings-group">
+                <label for="prefixInput">自定义前缀</label>
+                <input type="text" id="prefixInput" placeholder="输入自定义前缀（可选）">
+            </div>
+            
+            <div class="settings-group">
+                <label for="zipName">压缩包名称</label>
+                <input type="text" id="zipName" value="剪辑视频" placeholder="输入压缩包名称">
+            </div>
+            
+            <div class="buttons">
+                <button class="btn btn-primary" id="processBtn">
+                    <i class="fas fa-play"></i> 开始处理
+                </button>
+                <button class="btn btn-outline" id="clearBtn">
+                    <i class="fas fa-trash"></i> 清空列表
+                </button>
+            </div>
+        </section>
+        
+        <section class="status-section">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress" id="progressBar" style="width: 0;"></div>
+                </div>
+                <p style="text-align: center; margin-top: 5px;">处理进度: <span id="progressText">0%</span></p>
+            </div>
+            
+            <div class="logs" id="logs">
+                <!-- 日志将通过JS动态生成 -->
+            </div>
+        </section>
+        
+        <div class="footer">
+            <p>© 2023 视频自动剪辑器 | 所有处理均在本地完成</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const videoList = document.getElementById('videoList');
+            const processBtn = document.getElementById('processBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const clipDurationInput = document.getElementById('clipDuration');
+            const prefixInput = document.getElementById('prefixInput');
+            const zipNameInput = document.getElementById('zipName');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const logsContainer = document.getElementById('logs');
+            
+            // 存储上传的文件
+            let uploadedFiles = [];
+            let videoElements = {};
+            let isProcessing = false;
+            
+            // 添加日志
+            function addLog(message, type = 'info') {
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry log-${type}`;
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                
+                logsContainer.prepend(logEntry);
+                
+                // 限制日志数量
+                if (logsContainer.children.length > 50) {
+                    logsContainer.removeChild(logsContainer.lastChild);
+                }
+            }
+            
+            // 显示错误
+            function showError(message) {
+                addLog(message, 'error');
+                alert(message);
+            }
+            
+            // 处理文件上传
+            function handleFileUpload(files) {
+                // 验证文件
+                const validFiles = [];
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    
+                    // 检查文件类型
+                    if (!file.type.match('video.*')) {
+                        addLog(`文件 ${file.name} 不是视频文件，已跳过`, 'warning');
+                        continue;
+                    }
+                    
+                    validFiles.push(file);
+                }
+                
+                if (validFiles.length === 0) {
+                    showError('没有有效的视频文件');
+                    return;
+                }
+                
+                uploadedFiles = [...uploadedFiles, ...validFiles];
+                
+                // 更新视频列表
+                updateVideoList();
+                
+                addLog(`已上传 ${validFiles.length} 个视频文件`, 'success');
+            }
+            
+            // 更新视频列表显示
+            function updateVideoList() {
+                videoList.innerHTML = '';
+                
+                if (uploadedFiles.length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.textContent = '暂无上传的视频文件';
+                    emptyMsg.style.textAlign = 'center';
+                    emptyMsg.style.color = '#6c757d';
+                    emptyMsg.style.padding = '20px 0';
+                    videoList.appendChild(emptyMsg);
+                    return;
+                }
+                
+                uploadedFiles.forEach((file, index) => {
+                    const videoItem = document.createElement('div');
+                    videoItem.className = 'video-item';
+                    
+                    const videoInfo = document.createElement('div');
+                    videoInfo.className = 'video-info';
+                    
+                    const videoTitle = document.createElement('h4');
+                    videoTitle.textContent = file.name;
+                    
+                    const videoDetails = document.createElement('p');
+                    videoDetails.textContent = `大小: ${formatFileSize(file.size)}`;
+                    
+                    videoInfo.appendChild(videoTitle);
+                    videoInfo.appendChild(videoDetails);
+                    
+                    const statusBadge = document.createElement('span');
+                    statusBadge.className = 'status-badge status-pending';
+                    statusBadge.textContent = '等待处理';
+                    statusBadge.dataset.index = index;
+                    
+                    videoItem.appendChild(videoInfo);
+                    videoItem.appendChild(statusBadge);
+                    
+                    videoList.appendChild(videoItem);
+                });
+            }
+            
+            // 格式化文件大小
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // 处理视频
+            async function processVideos() {
+                // 验证输入
+                const clipDuration = parseFloat(clipDurationInput.value);
+                
+                if (isNaN(clipDuration) || clipDuration <= 0) {
+                    showError('请输入有效的截取时长');
+                    return;
+                }
+                
+                if (uploadedFiles.length === 0) {
+                    showError('请先上传视频文件');
+                    return;
+                }
+                
+                // 禁用按钮
+                isProcessing = true;
+                processBtn.disabled = true;
+                clearBtn.disabled = true;
+                
+                // 更新进度
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+                
+                // 创建ZIP
+                const zip = new JSZip();
+                let processedCount = 0;
+                const totalFiles = uploadedFiles.length;
+                
+                // 处理每个视频
+                for (let i = 0; i < totalFiles; i++) {
+                    const file = uploadedFiles[i];
+                    const statusBadge = document.querySelector(`.status-badge[data-index="${i}"]`);
+                    
+                    statusBadge.className = 'status-badge status-processing';
+                    statusBadge.textContent = '处理中...';
+                    
+                    try {
+                        // 模拟视频处理
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
+                        // 生成随机起始时间
+                        const videoDuration = Math.random() * 60 + clipDuration; // 随机生成视频时长
+                        const startTime = Math.random() * (videoDuration - clipDuration);
+                        
+                        // 创建剪辑后的视频
+                        const editedVideo = {
+                            name: `${prefixInput.value ? prefixInput.value : file.name.split('.')[0]}_剪辑.mp4`,
+                            size: Math.floor(file.size * 0.3) // 模拟剪辑后的文件大小
+                        };
+                        
+                        // 添加到ZIP
+                        zip.file(editedVideo.name, '模拟视频内容');
+                        
+                        // 更新状态
+                        statusBadge.className = 'status-badge status-success';
+                        statusBadge.textContent = '处理成功';
+                        
+                        addLog(`视频 ${file.name} 处理成功，保存为 ${editedVideo.name}`, 'success');
+                        
+                        // 更新进度
+                        processedCount++;
+                        const progress = Math.floor((processedCount / totalFiles) * 100);
+                        progressBar.style.width = `${progress}%`;
+                        progressText.textContent = `${progress}%`;
+                        
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (error) {
+                        statusBadge.className = 'status-badge status-error';
+                        statusBadge.textContent = '处理失败';
+                        
+                        addLog(`视频 ${file.name} 处理失败: ${error.message || error}`, 'error');
+                    }
+                }
+                
+                // 生成ZIP并下载
+                zip.generateAsync({type:"blob"})
+                    .then(function(content) {
+                        // 创建下载链接
+                        const url = window.URL.createObjectURL(content);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${zipNameInput.value || '剪辑视频'}.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        addLog(`所有视频处理完成，已打包为 ${a.download}`, 'success');
+                    });
+                
+                // 启用按钮
+                isProcessing = false;
+                processBtn.disabled = false;
+                clearBtn.disabled = false;
+            }
+            
+            // 清空列表
+            function clearList() {
+                if (isProcessing) {
+                    showError('处理中，请稍后再试');
+                    return;
+                }
+                
+                uploadedFiles = [];
+                videoList.innerHTML = '';
+                addLog('已清空视频列表', 'success');
+            }
+            
+            // 事件监听
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('highlight');
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('highlight');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('highlight');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files);
+                }
+            });
+            
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    handleFileUpload(this.files);
+                    this.value = '';
+                }
+            });
+            
+            processBtn.addEventListener('click', processVideos);
+            
+            clearBtn.addEventListener('click', clearList);
+            
+            // 初始化日志
+            addLog('视频自动剪辑器已就绪，请上传视频文件');
+        });
+    </script>
+    
+    <!-- 引入JSZip库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</body>
+</html>

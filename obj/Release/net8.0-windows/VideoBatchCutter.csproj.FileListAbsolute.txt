@@ -1,0 +1,14 @@
+G:\编程\自动剪辑器\C#\videobatchcutter\bin\Release\net8.0-windows\VideoBatchCutter.exe
+G:\编程\自动剪辑器\C#\videobatchcutter\bin\Release\net8.0-windows\VideoBatchCutter.deps.json
+G:\编程\自动剪辑器\C#\videobatchcutter\bin\Release\net8.0-windows\VideoBatchCutter.runtimeconfig.json
+G:\编程\自动剪辑器\C#\videobatchcutter\bin\Release\net8.0-windows\VideoBatchCutter.dll
+G:\编程\自动剪辑器\C#\videobatchcutter\bin\Release\net8.0-windows\VideoBatchCutter.pdb
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.GeneratedMSBuildEditorConfig.editorconfig
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.AssemblyInfoInputs.cache
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.AssemblyInfo.cs
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.csproj.CoreCompileInputs.cache
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.dll
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\refint\VideoBatchCutter.dll
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.pdb
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\VideoBatchCutter.genruntimeconfig.cache
+G:\编程\自动剪辑器\C#\videobatchcutter\obj\Release\net8.0-windows\ref\VideoBatchCutter.dll

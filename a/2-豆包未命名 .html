@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频自动剪辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .drop-zone { transition: all 0.3s ease; }
+        .drop-zone.dragover { border-color: #3b82f6; background-color: #eff6ff; transform: scale(1.02); }
+        .progress-bar { transition: width 0.3s ease; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .loading { animation: pulse 1.5s infinite; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- 顶部 -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-slate-800 mb-2">视频自动剪辑器</h1>
+            <p class="text-green-600 text-sm flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                所有处理在本地完成，视频不上传服务器
+            </p>
+        </header>
+
+        <!-- 上传区域 -->
+        <div id="dropZone" class="drop-zone border-4 border-dashed border-slate-300 rounded-2xl p-12 text-center mb-6 cursor-pointer bg-white hover:border-blue-400">
+            <svg class="w-16 h-16 mx-auto text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <p class="text-xl text-slate-600 mb-2">拖拽视频文件到这里</p>
+            <p class="text-slate-400">或点击选择文件（支持 MP4, MOV, AVI, FLV 等）</p>
+            <input type="file" id="fileInput" class="hidden" accept="video/*" multiple>
+        </div>
+
+        <!-- 设置区 -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">截取时长（秒）*</label>
+                    <input type="number" id="duration" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如：5" min="1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">每视频截取段数*</label>
+                    <input type="number" id="clipsPerVideo" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如：3" min="1" value="1">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">文件名前缀（可选）</label>
+                    <input type="text" id="prefix" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="例如：我的视频">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">压缩包名称（可选）</label>
+                    <input type="text" id="zipName" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="默认：clipped_videos.zip">
+                </div>
+            </div>
+        </div>
+
+        <!-- 按钮区 -->
+        <div class="flex gap-4 mb-6">
+            <button id="startBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                开始处理
+            </button>
+            <button id="clearBtn" class="px-6 py-3 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
+                清空列表
+            </button>
+        </div>
+
+        <!-- 进度条 -->
+        <div id="progressContainer" class="hidden mb-6">
+            <div class="flex justify-between text-sm text-slate-600 mb-2">
+                <span id="progressText">处理中...</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-3">
+                <div id="progressBar" class="progress-bar bg-blue-600 h-3 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 视频列表 -->
+        <div id="videoListContainer" class="hidden bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+            <div class="p-4 border-b border-slate-200 bg-slate-50">
+                <h3 class="font-semibold text-slate-800">视频列表</h3>
+            </div>
+            <div id="videoList" class="divide-y divide-slate-100 max-h-80 overflow-y-auto"></div>
+        </div>
+
+        <!-- 日志区 -->
+        <div id="logContainer" class="bg-slate-900 rounded-xl p-4 font-mono text-sm">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-slate-400">操作日志</span>
+                <button id="clearLog" class="text-slate-500 hover:text-slate-300 text-xs">清空</button>
+            </div>
+            <div id="log" class="h-40 overflow-y-auto text-slate-300 space-y-1">
+                <p class="text-green-400">✓ 系统就绪，请上传视频文件</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 状态管理
+        const state = {
+            videos: [],
+            processing: false
+        };
+
+        // DOM 元素
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const durationInput = document.getElementById('duration');
+        const clipsPerVideoInput = document.getElementById('clipsPerVideo');
+        const prefixInput = document.getElementById('prefix');
+        const zipNameInput = document.getElementById('zipName');
+        const startBtn = document.getElementById('startBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const videoListContainer = document.getElementById('videoListContainer');
+        const videoList = document.getElementById('videoList');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const log = document.getElementById('log');
+        const clearLogBtn = document.getElementById('clearLog');
+
+        // 日志函数
+        function addLog(message, type = 'info') {
+            const p = document.createElement('p');
+            const time = new Date().toLocaleTimeString();
+            const colors = { info: 'text-slate-300', success: 'text-green-400', error: 'text-red-400', warning: 'text-yellow-400' };
+            p.className = colors[type];
+            p.textContent = `[${time}] ${message}`;
+            log.appendChild(p);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // 获取视频时长
+        function getVideoDuration(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.onloadedmetadata = () => {
+                    URL.revokeObjectURL(video.src);
+                    resolve(video.duration);
+                };
+                video.onerror = () => reject(new Error('无法读取视频文件'));
+                video.src = URL.createObjectURL(file);
+            });
+        }
+
+        // 处理文件上传
+        async function handleFiles(files) {
+            const validVideos = [];
+            for (const file of files) {
+                if (!file.type.startsWith('video/')) {
+                    addLog(`跳过非视频文件: ${file.name}`, 'warning');
+                    continue;
+                }
+                try {
+                    const duration = await getVideoDuration(file);
+                    validVideos.push({ file, duration, name: file.name, status: 'pending' });
+                    addLog(`已添加: ${file.name} (${duration.toFixed(2)}秒)`, 'info');
+                } catch (e) {
+                    addLog(`无法解析: ${file.name}`, 'error');
+                }
+            }
+            if (validVideos.length > 0) {
+                state.videos.push(...validVideos);
+                renderVideoList();
+            }
+        }
+
+        // 渲染视频列表
+        function renderVideoList() {
+            videoListContainer.classList.remove('hidden');
+            videoList.innerHTML = state.videos.map((v, i) => `
+                <div class="p-4 flex items-center justify-between hover:bg-slate-50">
+                    <div class="flex items-center gap-4 min-w-0">
+                        <span class="text-slate-400 font-medium w-8">${i + 1}</span>
+                        <div class="min-w-0">
+                            <p class="text-slate-800 font-medium truncate">${v.name}</p>
+                            <p class="text-slate-500 text-sm">时长: ${v.duration.toFixed(2)}秒</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm px-2 py-1 rounded-full ${getStatusClass(v.status)}">${getStatusText(v.status)}</span>
+                        <button onclick="removeVideo(${i})" class="text-slate-400 hover:text-red-500 p-1" ${state.processing ? 'disabled' : ''}>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusClass(status) {
+            const classes = { pending: 'bg-slate-100 text-slate-600', processing: 'bg-blue-100 text-blue-600 loading', success: 'bg-green-100 text-green-600', error: 'bg-red-100 text-red-600' };
+            return classes[status] || classes.pending;
+        }
+
+        function getStatusText(status) {
+            const texts = { pending: '等待处理', processing: '处理中...', success: '处理成功', error: '处理失败' };
+            return texts[status] || texts.pending;
+        }
+
+        window.removeVideo = function(index) {
+            if (state.processing) return;
+            const removed = state.videos.splice(index, 1)[0];
+            addLog(`已移除: ${removed.name}`, 'info');
+            if (state.videos.length === 0) videoListContainer.classList.add('hidden');
+            else renderVideoList();
+        };
+
+        // 剪辑视频
+        async function clipVideo(video, start, duration) {
+            return new Promise((resolve, reject) => {
+                const videoEl = document.createElement('video');
+                videoEl.src = URL.createObjectURL(video.file);
+                videoEl.muted = true;
+                videoEl.crossOrigin = 'anonymous';
+
+                videoEl.onloadedmetadata = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoEl.videoWidth;
+                    canvas.height = videoEl.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    
+                    const stream = canvas.captureStream(30);
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaElementSource(videoEl);
+                    const dest = audioCtx.createMediaStreamDestination();
+                    source.connect(dest);
+                    stream.addTrack(dest.stream.getAudioTracks()[0]);
+
+                    const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+                    const chunks = [];
+
+                    mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        URL.revokeObjectURL(videoEl.src);
+                        audioCtx.close();
+                        resolve(new Blob(chunks, { type: 'video/webm' }));
+                    };
+
+                    videoEl.currentTime = start;
+
+                    videoEl.onseeked = () => {
+                        if (Math.abs(videoEl.currentTime - start) < 0.1) {
+                            videoEl.play();
+                            mediaRecorder.start(100);
+                            
+                            function draw() {
+                                if (videoEl.readyState >= 2) {
+                                    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                                }
+                                if (!videoEl.paused) {
+                                    requestAnimationFrame(draw);
+                                }
+                            }
+                            draw();
+
+                            setTimeout(() => {
+                                videoEl.pause();
+                                mediaRecorder.stop();
+                            }, duration * 1000);
+                        }
+                    };
+                };
+
+                videoEl.onerror = () => reject(new Error('视频加载失败'));
+            });
+        }
+
+        // 生成不重叠的随机起始时间
+        function generateRandomStarts(videoDuration, clipDuration, numClips) {
+            const maxStart = videoDuration - clipDuration;
+            if (maxStart <= 0) return [];
+            
+            const starts = [];
+            const minGap = Math.min(clipDuration, 2); // 片段间最小间隔
+            
+            for (let i = 0; i < numClips; i++) {
+                let attempts = 0;
+                let newStart;
+                
+                do {
+                    newStart = Math.random() * maxStart;
+                    attempts++;
+                } while (
+                    attempts < 100 && 
+                    starts.some(s => Math.abs(s - newStart) < (clipDuration + minGap))
+                );
+                
+                starts.push(newStart);
+            }
+            
+            return starts.sort((a, b) => a - b);
+        }
+
+        // 开始处理
+        async function startProcessing() {
+            const clipDuration = parseFloat(durationInput.value);
+            const clipsPerVideo = parseInt(clipsPerVideoInput.value) || 1;
+            
+            if (!clipDuration || clipDuration <= 0) {
+                alert('请输入有效的截取时长（秒）');
+                return;
+            }
+            if (clipsPerVideo < 1) {
+                alert('每视频至少截取 1 段');
+                return;
+            }
+            if (state.videos.length === 0) {
+                alert('请先上传视频文件');
+                return;
+            }
+
+            const invalidVideos = state.videos.filter(v => v.duration < clipDuration);
+            if (invalidVideos.length > 0) {
+                alert(`以下视频时长小于 ${clipDuration} 秒：\n${invalidVideos.map(v => v.name).join('\n')}`);
+                return;
+            }
+
+            state.processing = true;
+            startBtn.disabled = true;
+            clearBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+
+            const zip = new JSZip();
+            const prefix = prefixInput.value.trim();
+            let totalClips = 0;
+            let successCount = 0;
+
+            const totalTasks = state.videos.length * clipsPerVideo;
+            let currentTask = 0;
+
+            try {
+                for (let i = 0; i < state.videos.length; i++) {
+                    const video = state.videos[i];
+                    video.status = 'processing';
+                    renderVideoList();
+                    
+                    const starts = generateRandomStarts(video.duration, clipDuration, clipsPerVideo);
+                    addLog(`正在处理: ${video.name}，将截取 ${starts.length} 个片段`, 'info');
+
+                    let videoSuccess = true;
+                    
+                    for (let j = 0; j < starts.length; j++) {
+                        const start = starts[j];
+                        progressText.textContent = `正在处理: ${video.name} (片段 ${j + 1}/${starts.length})`;
+                        addLog(`  片段 ${j + 1}: 随机起点 ${start.toFixed(2)}秒`, 'info');
+
+                        try {
+                            const clippedBlob = await clipVideo(video, start, clipDuration);
+                            
+                            let fileName;
+                            if (prefix) {
+                                fileName = `${prefix}_${i + 1}_片段${j + 1}.webm`;
+                            } else {
+                                const baseName = video.name.replace(/\.[^/.]+$/, '');
+                                fileName = `${baseName}_片段${j + 1}.webm`;
+                            }
+                            
+                            zip.file(fileName, clippedBlob);
+                            successCount++;
+                            addLog(`  ✓ 片段 ${j + 1} 完成: ${fileName}`, 'success');
+                        } catch (e) {
+                            videoSuccess = false;
+                            addLog(`  ✗ 片段 ${j + 1} 失败: ${e.message}`, 'error');
+                        }
+
+                        currentTask++;
+                        const progress = (currentTask / totalTasks) * 100;
+                        progressBar.style.width = `${progress}%`;
+                        progressPercent.textContent = `${Math.round(progress)}%`;
+                    }
+
+                    video.status = videoSuccess ? 'success' : 'error';
+                    renderVideoList();
+                }
+
+                progressText.textContent = '正在生成压缩包...';
+                const zipFileName = zipNameInput.value.trim() || 'clipped_videos.zip';
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                saveAs(zipBlob, zipFileName.endsWith('.zip') ? zipFileName : `${zipFileName}.zip`);
+
+                progressText.textContent = `处理完成！成功生成 ${successCount} 个视频片段`;
+                addLog(`全部完成！共生成 ${successCount} 个片段，已下载压缩包`, 'success');
+            } catch (e) {
+                addLog(`处理出错: ${e.message}`, 'error');
+                progressText.textContent = '处理出错';
+            } finally {
+                state.processing = false;
+                startBtn.disabled = false;
+                clearBtn.disabled = false;
+            }
+        }
+
+        // 事件监听
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        startBtn.addEventListener('click', startProcessing);
+        clearBtn.addEventListener('click', () => {
+            if (state.processing) return;
+            state.videos = [];
+            videoListContainer.classList.add('hidden');
+            addLog('已清空列表', 'info');
+        });
+        clearLogBtn.addEventListener('click', () => {
+            log.innerHTML = '<p class="text-green-400">✓ 日志已清空</p>';
+        });
+    </script>
+</body>
+</html>

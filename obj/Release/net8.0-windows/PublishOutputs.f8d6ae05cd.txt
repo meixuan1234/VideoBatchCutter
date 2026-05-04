@@ -1,0 +1,5 @@
+G:\编程\自动剪辑器\发布\VideoBatchCutter.exe
+G:\编程\自动剪辑器\发布\VideoBatchCutter.dll
+G:\编程\自动剪辑器\发布\VideoBatchCutter.deps.json
+G:\编程\自动剪辑器\发布\VideoBatchCutter.runtimeconfig.json
+G:\编程\自动剪辑器\发布\VideoBatchCutter.pdb
