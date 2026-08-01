@@ -67,6 +67,7 @@ public class VideoProcessor
         };
 
         _globalSegmentIndex = 0;
+        int fallbackCount = 0;
 
         try
         {
@@ -75,6 +76,23 @@ public class VideoProcessor
             Directory.CreateDirectory(config.OutputDirectory);
 
             _segmentGenerator.GenerateAllSegments(videos, config);
+
+            // 记录无片段的视频（如启用去除前5秒但视频时长不足）
+            foreach (var video in videos)
+            {
+                if (video.Segments.Count == 0)
+                {
+                    if (config.SkipFirstFiveSeconds && video.Duration <= 5)
+                    {
+                        LogMessage?.Invoke(this, $"跳过过短视频: {video.FileNameWithoutExtension}（时长 {video.Duration:F1} 秒，启用去除前5秒）");
+                    }
+                    else
+                    {
+                        LogMessage?.Invoke(this, $"跳过无可用片段的视频: {video.FileNameWithoutExtension}（时长 {video.Duration:F1} 秒）");
+                    }
+                }
+            }
+
             int totalSegments = videos.Sum(v => v.Segments.Count);
             overallProgress.TotalSegments = totalSegments;
 
@@ -119,12 +137,28 @@ public class VideoProcessor
 
                     LogMessage?.Invoke(this, $"裁剪片段 {segment.SegmentIndex}/{video.Segments.Count}: {video.FileNameWithoutExtension} [{segment.StartTimeText}]");
 
-                    bool success = await _ffmpegService.CutSegmentAsync(segment, video.FilePath, outputPath, cancellationToken);
+                    FFmpegResult cutResult = await _ffmpegService.CutSegmentAsync(
+                        segment,
+                        video.FilePath,
+                        outputPath,
+                        config.OutputEncoder,
+                        config.HighQualityMode,
+                        cancellationToken);
 
-                    if (success)
+                    if (cutResult.Success)
                     {
                         segment.Status = SegmentStatus.Completed;
                         result.SuccessfulSegments++;
+
+                        // 若发生硬件编码器回退，记录并输出提示日志
+                        if (cutResult.WasFallbackUsed)
+                        {
+                            fallbackCount++;
+                            string originalName = FFmpegService.GetEncoderDisplayName(config.OutputEncoder);
+                            string finalName = FFmpegService.GetEncoderDisplayName(cutResult.FinalEncoder);
+                            LogMessage?.Invoke(this, $"[回退] {originalName} 不可用，已切换到 {finalName}: {outputFileName}");
+                        }
+
                         LogMessage?.Invoke(this, $"✓ 片段裁剪完成: {outputFileName}");
                     }
                     else
@@ -176,17 +210,20 @@ public class VideoProcessor
             progress?.Report(overallProgress);
             ProgressChanged?.Invoke(this, overallProgress);
 
-            LogMessage?.Invoke(this, $"处理完成！成功: {result.SuccessfulSegments}, 失败: {result.FailedSegments}");
+            result.FallbackCount = fallbackCount;
+            LogMessage?.Invoke(this, $"处理完成！成功: {result.SuccessfulSegments}, 失败: {result.FailedSegments}, 编码器回退: {result.FallbackCount} 次");
         }
         catch (OperationCanceledException)
         {
             overallProgress.IsProcessing = false;
+            result.FallbackCount = fallbackCount;
             LogMessage?.Invoke(this, "处理已取消");
             throw;
         }
         catch (Exception ex)
         {
             overallProgress.IsProcessing = false;
+            result.FallbackCount = fallbackCount;
             LogMessage?.Invoke(this, $"处理出错: {ex.Message}");
             result.ErrorMessage = ex.Message;
         }
@@ -315,6 +352,12 @@ public class ProcessingResult
 {
     public int SuccessfulSegments { get; set; }
     public int FailedSegments { get; set; }
+
+    /// <summary>
+    /// 硬件编码器失败回退到 CPU 编码器的次数
+    /// </summary>
+    public int FallbackCount { get; set; }
+
     public string ZipFilePath { get; set; } = string.Empty;
     public string? ErrorMessage { get; set; }
     public bool IsSuccess => string.IsNullOrEmpty(ErrorMessage);
