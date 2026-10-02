@@ -14,12 +14,20 @@ public class SegmentGenerator
     /// </summary>
     /// <param name="videoInfo">视频信息</param>
     /// <param name="config">处理配置</param>
-    /// <returns>片段列表</returns>
+    /// <returns>片段列表；若视频过短或配置导致无可用区间，则返回空列表</returns>
+    /// <remarks>
+    /// 当 <see cref="ProcessingConfig.SkipFirstFiveSeconds"/> 为 true 时，
+    /// 片段起始时间将从第 5 秒之后开始计算；若视频时长小于等于 5 秒，则不生成片段。
+    /// </remarks>
     public List<VideoSegment> GenerateSegments(VideoFileInfo videoInfo, ProcessingConfig config)
     {
         var segments = new List<VideoSegment>();
 
         if (videoInfo.Duration <= 0)
+            return segments;
+
+        // 启用去除前5秒时，视频时长必须大于5秒才有可用区间
+        if (config.SkipFirstFiveSeconds && videoInfo.Duration <= 5)
             return segments;
 
         // 计算可用时间范围（留出片段时长+1秒余量）
@@ -28,23 +36,34 @@ public class SegmentGenerator
             maxStartTime = 0;
 
         // 如果视频太短，只能生成1段从开头截取
+        // 启用去除前5秒时，需保证去除前5秒后仍能容纳片段；否则不生成片段
         if (videoInfo.Duration <= config.SegmentDuration)
         {
-            segments.Add(new VideoSegment
+            if (!config.SkipFirstFiveSeconds)
             {
-                VideoFileId = videoInfo.Id,
-                SegmentIndex = 1,
-                StartTime = 0,
-                Duration = Math.Min(videoInfo.Duration, config.SegmentDuration),
-                Status = SegmentStatus.Pending
-            });
+                segments.Add(new VideoSegment
+                {
+                    VideoFileId = videoInfo.Id,
+                    SegmentIndex = 1,
+                    StartTime = 0,
+                    Duration = Math.Min(videoInfo.Duration, config.SegmentDuration),
+                    Status = SegmentStatus.Pending
+                });
+            }
             return segments;
         }
+
+        // 确定可用起始区间的左边界：启用去除前5秒时为 5，否则为 0
+        double rangeStart = config.SkipFirstFiveSeconds ? 5 : 0;
+
+        // 可用区间右边界不能小于左边界，否则无可用区间
+        if (maxStartTime <= rangeStart)
+            return segments;
 
         // 使用区间排除法生成不重叠的随机起始点
         var availableRanges = new List<(double Start, double End)>
         {
-            (0, maxStartTime)
+            (rangeStart, maxStartTime)
         };
 
         int maxAttempts = config.SegmentsPerVideo * 100;
@@ -99,7 +118,7 @@ public class SegmentGenerator
             // 更新可用区间（排除已选区域及其前后1秒缓冲）
             availableRanges.RemoveAt(selectedIndex);
 
-            double bufferBefore = Math.Max(0, startTime - 1);
+            double bufferBefore = Math.Max(rangeStart, startTime - 1);
             double bufferAfter = Math.Min(maxStartTime, endTime + 1);
 
             if (selectedRange.Start < bufferBefore - 0.1)
@@ -129,6 +148,8 @@ public class SegmentGenerator
     /// <summary>
     /// 为所有视频生成片段
     /// </summary>
+    /// <param name="videos">视频信息列表</param>
+    /// <param name="config">处理配置</param>
     public void GenerateAllSegments(List<VideoFileInfo> videos, ProcessingConfig config)
     {
         foreach (var video in videos)

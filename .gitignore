@@ -1,0 +1,19 @@
+# Build artifacts
+bin/
+obj/
+发布/
+
+# IDE files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temp files
+*.tmp
+*.log
+startup_error.log
+
+# HTML drafts
+a/
