@@ -1,5 +1,9 @@
 # VideoBatchCutter - 视频批量剪辑工具
 
+<!-- quick-pitch -->
+> 一段两小时的录屏，想切成 60 个小片段？
+> 拖进来、填个数字，剩下的它自己做完，还自动打包成 ZIP。
+
 基于 WinForms + FFmpeg 的视频批量分段剪辑工具，采用 TRAE 暗色设计风格。
 
 ## 功能
