@@ -958,11 +958,14 @@ public class MainForm : Form
     /// <returns>数值选择控件</returns>
     private NumericUpDown CreateNumericUpDown(int value, int min, int max)
     {
+        // 注意：必须先设置 Minimum/Maximum，再设置 Value。
+        // 否则当 value 超过 NumericUpDown 默认最大值 100（例如 512）时会抛出
+        // "Value 应介于 Minimum 和 Maximum 之间" 的 ArgumentException 导致程序启动失败。
         var numeric = new NumericUpDown
         {
-            Value = value,
             Minimum = min,
             Maximum = max,
+            Value = value,
             Dock = DockStyle.Fill,
             Font = UIFont,
             Margin = new Padding(0, Spacing4, 0, Spacing4),
